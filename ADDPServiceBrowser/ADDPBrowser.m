@@ -18,6 +18,18 @@ int const ADDPPort = 2362;
 
 }
 
+- (void)startBrowsing:(int)delay {
+
+    [self startBrowsing];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+
+        [self stopBrowsing];
+
+    });
+
+}
+
 - (void)startBrowsing {
 
     self.socket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
@@ -168,6 +180,7 @@ withFilterContext:(id)filterContext{
     }
 
 }
+
 
 
 @end

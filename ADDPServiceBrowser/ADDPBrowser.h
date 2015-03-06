@@ -25,5 +25,5 @@
 - (void) stopBrowsing;
 
 
-
+- (void)startBrowsing:(int)i;
 @end
