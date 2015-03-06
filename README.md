@@ -13,7 +13,7 @@ Advanced Device Discovery Protocol (ADDP) library for iOS
 
 ```
 pod 'ADDPServiceBrowser', :git => 'https://github.com/DREEBIT/ADDPServiceBrowser.git'
-´´´
+```
 
 ## Usage
 
