@@ -9,6 +9,9 @@ Advanced Device Discovery Protocol (ADDP) library for iOS
 - Get Device Information (MAC, IP Address, netmask, title)
 - Use addp protocols for simple integration in your UIViewControllers
 
+```
+pod 'ADDPServiceBrowser', :git => 'https://github.com/DREEBIT/ADDPServiceBrowser.git'
+´´´
 ## Usage
 
 #### Initialize the browser
