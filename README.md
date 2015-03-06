@@ -11,7 +11,7 @@ Advanced Device Discovery Protocol (ADDP) library for iOS
 
 ## Usage
 
-### Initialize the browser
+#### Initialize the browser
 ```objective-c
   
   self.browser = [[ADDPBrowser alloc] init];
@@ -30,10 +30,9 @@ Advanced Device Discovery Protocol (ADDP) library for iOS
 
 ```
 
-### Implement the protocol methods
+#### Implement the protocol methods
 ```objective-c
   
-### Initialize the browser
 - (void)addpBrowser:(ADDPBrowser *)browser didFindDevice:(ADDPDevice *)device {
 
     NSLog(@"New device found: %@", [device description]);
