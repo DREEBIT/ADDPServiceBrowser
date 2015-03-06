@@ -10,6 +10,7 @@
 
 
 @protocol ADDPBrowserDelegate<NSObject>
+- (void) addpBrowser:(ADDPBrowser *)browser didStartBrowsing:(NSData *)address;
 - (void) addpBrowser:(ADDPBrowser *)browser didNotStartBrowsingForDevices:(NSError *)error;
 - (void) addpBrowser:(ADDPBrowser *)browser didFindDevice:(ADDPDevice *)device;
 @end

@@ -6,8 +6,6 @@
 #import "ADDPBrowser.h"
 #import "GCDAsyncUdpSocket.h"
 
-
-
 NSString *const ADDPMulticastGroupAddress = @"224.0.5.128";
 int const ADDPPort = 2362;
 
@@ -77,10 +75,17 @@ int const ADDPPort = 2362;
 
 }
 
-- (void)udpSocketDidClose:(GCDAsyncUdpSocket *)sock withError:(NSError *)error {
-    if( error ) {
-        [self notifyDelegateWithError:error];
+
+- (void)udpSocket:(GCDAsyncUdpSocket *)sock didConnectToAddress:(NSData *)address {
+    if ([self.delegate respondsToSelector:@selector(addpBrowser:didStartBrowsing:)]){
+        [self.delegate addpBrowser:self didStartBrowsing:address];
     }
+}
+
+- (void)udpSocketDidClose:(GCDAsyncUdpSocket *)sock withError:(NSError *)error {
+
+    [self notifyDelegateWithError:error];
+
 }
 
 - (void)udpSocket:(GCDAsyncUdpSocket *)sock didReceiveData:(NSData *)data
