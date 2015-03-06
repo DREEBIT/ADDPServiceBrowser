@@ -14,5 +14,6 @@
 @property (nonatomic, strong) NSString *mac;
 @property (nonatomic, strong) NSString *submask;
 @property (nonatomic, strong) NSString *title;
+@property (nonatomic, strong) NSString *gateway;
 
 @end

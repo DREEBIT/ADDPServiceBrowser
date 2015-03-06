@@ -4,9 +4,9 @@
 //
 
 #import <Foundation/Foundation.h>
-
+#import "ADDPDevice.h"
 @class ADDPBrowser;
-@class ADDPDevice;
+
 
 
 @protocol ADDPBrowserDelegate<NSObject>

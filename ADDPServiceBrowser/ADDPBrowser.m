@@ -5,14 +5,7 @@
 
 #import "ADDPBrowser.h"
 #import "GCDAsyncUdpSocket.h"
-#import "ADDPDevice.h"
 
-#import <ifaddrs.h>
-#import <sys/socket.h>
-#import <net/if.h>
-#import <arpa/inet.h>
-#include <netinet/in.h>
-#import <netdb.h>
 
 
 NSString *const ADDPMulticastGroupAddress = @"224.0.5.128";
@@ -34,29 +27,10 @@ int const ADDPPort = 2362;
 
     NSError *err = nil;
 
-    NSDictionary *interfaces = [ADDPBrowser availableNetworkInterfaces];
-
-    id sourceAddress = [[interfaces allValues] firstObject];
-
-
-
-//
-//    if(![self.socket bindToPort:ADDPPort error:&err]) {
-//        [self notifyDelegateWithError:err];
-//        return;
-//    }
-
-
-
     if(![self.socket enableBroadcast:YES error:&err]) {
         [self notifyDelegateWithError:err];
         return;
     }
-//
-//    if(![self.socket joinMulticastGroup:ADDPMulticastGroupAddress error:&err]) {
-//        [self notifyDelegateWithError:err];
-//        return;
-//    }
 
 
     if(![self.socket beginReceiving:&err]) {
@@ -82,7 +56,6 @@ int const ADDPPort = 2362;
     strChar[13] = 0xff;
 
     NSData *data = [[NSData alloc] initWithBytes:strChar length:14];
-
 
     [self.socket sendData:data toHost:ADDPMulticastGroupAddress port:ADDPPort withTimeout:-1 tag:0];
 
@@ -110,104 +83,85 @@ int const ADDPPort = 2362;
     }
 }
 
-- (void)udpSocket:(GCDAsyncUdpSocket *)sock didConnectToAddress:(NSData *)address{
-    NSLog(@"didConnectToAddress");
-}
-
-- (void)udpSocket:(GCDAsyncUdpSocket *)sock didNotConnect:(NSError *)error{
-    NSLog(@"didNotConnect: %@", [error localizedDescription]);
-}
-
-- (void)udpSocket:(GCDAsyncUdpSocket *)sock didSendDataWithTag:(long)tag{
-    NSLog(@"didSendDataWithTag: %d", tag);
-}
-
-- (void)udpSocket:(GCDAsyncUdpSocket *)sock didNotSendDataWithTag:(long)tag dueToError:(NSError *)error{
-    NSLog(@"didNotSendDataWithTag: %@", [error localizedDescription]);
-}
-
 - (void)udpSocket:(GCDAsyncUdpSocket *)sock didReceiveData:(NSData *)data
       fromAddress:(NSData *)address
 withFilterContext:(id)filterContext{
 
-
-
-    NSString *msg = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    NSLog(@"didReceiveData: %@",msg);
-    if( msg ) {
-
-        ADDPDevice *device = [self parseDeviceFromMessage:msg];
-        if (device.mac && [self.delegate respondsToSelector:@selector(addpBrowser:didFindDevice:)]){
-            [self.delegate addpBrowser:self didFindDevice:device];
-        }
-
-    }
-    else {
-        NSString *host = nil;
-        uint16_t port = 0;
-        [GCDAsyncUdpSocket getHost:&host port:&port fromAddress:address];
-
-        NSLog(@"Got unknown Message: %@:%hu", host, port);
+    ADDPDevice *device = [self parseDeviceFromMessage:data];
+    if (device.mac && [self.delegate respondsToSelector:@selector(addpBrowser:didFindDevice:)]){
+        [self.delegate addpBrowser:self didFindDevice:device];
     }
 
 }
 
-- (ADDPDevice *)parseDeviceFromMessage:(NSString *)msg {
+- (ADDPDevice *)parseDeviceFromMessage:(NSData *)data {
+
+    if (![data bytes]){
+        return nil;
+    }
 
     ADDPDevice *newDevice = [[ADDPDevice alloc] init];
 
+    unsigned char* buffer = (unsigned char*) [data bytes];
 
-    char* adrMac = (char *) [[msg substringWithRange:NSMakeRange(10, 6)] UTF8String];
-    newDevice.mac = [NSString stringWithFormat:@"%02X-%02X-%02X-%02X-%02X-%02X", adrMac[0], adrMac[1], adrMac[2], adrMac[3], adrMac[4], adrMac[5]];
+    //MAC Address
+    unsigned char mac[6] = {};
+    char hexMac[20] = {};
+    [self insertCharsFromIndex:10 withLenth:6 fromBuffer:buffer inBuffer:mac];
+    sprintf(hexMac, "%02X-%02X-%02X-%02X-%02X-%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    NSString *macString = [[NSString alloc] initWithBytes:(void *)hexMac length:20 encoding:NSASCIIStringEncoding];
+    if (macString.length>0){
+        newDevice.mac = macString;
+    }
 
-    char* ipAdr = (char *) [[msg substringWithRange:NSMakeRange(18, 4)] UTF8String];
-    newDevice.ip = [NSString stringWithFormat:@"%d.%d.%d.%d", ipAdr[0], ipAdr[1], ipAdr[2], ipAdr[3]];
+    //IP Address
+    unsigned char ip[4] = {};
+    char ipFormatted[16];
+    [self insertCharsFromIndex:18 withLenth:4 fromBuffer:buffer inBuffer:ip];
+    sprintf(ipFormatted, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    NSString *ipString = [[NSString alloc] initWithBytes:(void *)ipFormatted length:15 encoding:NSASCIIStringEncoding];
+    if (ipString.length>0){
+        newDevice.ip = ipString;
+    }
 
-    char* subnet = (char *) [[msg substringWithRange:NSMakeRange(24, 4)] UTF8String];
-    newDevice.submask = [NSString stringWithFormat:@"%03d.%03d.%03d.%03d", subnet[0], subnet[1], subnet[2], subnet[3]];
+    //Subnet mask
+    unsigned char subnet[4] = {};
+    char subnetFormat[16];
+    [self insertCharsFromIndex:24 withLenth:4 fromBuffer:buffer inBuffer:subnet];
+    sprintf(subnetFormat, "%03d.%03d.%03d.%03d", subnet[0], subnet[1], subnet[2], subnet[3]);
+    NSString *subnetString = [[NSString alloc] initWithBytes:(void *) subnetFormat length:16 encoding:NSASCIIStringEncoding];
+    if (subnetString.length>0){
+        newDevice.submask = subnetString;
+    }
 
-    char* name = (char *) [[msg substringFromIndex:32] UTF8String];
-    newDevice.title = [[NSString alloc] initWithBytes:(void *)name length:32 encoding:NSASCIIStringEncoding];
+
+    //Device title
+    unsigned char name[32] = {};
+    [self parseUntilBreakPointFromBuffer:buffer fromIndex:30 toBuffer:name];
+    NSString *titleString = [[NSString alloc] initWithBytes:(void *)name length:32 encoding:NSASCIIStringEncoding];
+    if (titleString.length>0){
+        newDevice.title = titleString;
+    }
 
     return newDevice;
 }
 
-- (void) getInformationAtIndex:(NSInteger)index withLenth:(NSUInteger)len fromFrame:(unsigned char *)frame inBuffer:(unsigned char *)infos
+- (void) parseUntilBreakPointFromBuffer:(unsigned char *)frame fromIndex:(int)startIndex toBuffer:(unsigned char *)deviceName
+{
+    int i = 0;
+
+    while (frame[i + startIndex] != 0x12 && frame[i + startIndex] !=  0x10 && frame[i + startIndex] !=  0x0d) {
+        deviceName[i] = frame[i + startIndex];
+        i++;
+    }
+}
+
+- (void) insertCharsFromIndex:(NSInteger)index withLenth:(NSUInteger)len fromBuffer:(unsigned char *)source inBuffer:(unsigned char *)target
 {
     for (int i = index; i < (index + len); i++) {
-        infos[i - index] = frame[i];
+        target[i - index] = source[i];
     }
 
-}
-
-
-- (NSString *)sourceAddress {
-    NSString *host = nil;
-    uint16_t port = 0;
-    [GCDAsyncUdpSocket getHost:&host port:&port fromAddress:[_socket localAddress]];
-    return host;
-}
-
-
-+ (NSDictionary *) availableNetworkInterfaces {
-    NSMutableDictionary *addresses = [NSMutableDictionary dictionary];
-    struct ifaddrs *interfaces = NULL;
-    struct ifaddrs *ifa = NULL;
-
-    // retrieve the current interfaces - returns 0 on success
-    if( getifaddrs(&interfaces) == 0 ) {
-        for( ifa = interfaces; ifa != NULL; ifa = ifa->ifa_next ) {
-            if( (ifa->ifa_addr->sa_family == AF_INET) && !(ifa->ifa_flags & IFF_LOOPBACK) && !strncmp(ifa->ifa_name, "en", 2)) {
-                NSData *data = [NSData dataWithBytes:ifa->ifa_addr length:sizeof(struct sockaddr_in)];
-                NSString *if_name = [NSString stringWithUTF8String:ifa->ifa_name];
-                [addresses setObject:data forKey:if_name];
-            }
-        }
-
-        freeifaddrs(interfaces);
-    }
-
-    return addresses;
 }
 
 

@@ -20,11 +20,34 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.data = [NSMutableArray array];
+
 
     self.browser = [[ADDPBrowser alloc] init];
     [self.browser setDelegate:self];
-    [self.browser startBrowsing];
+
+    UIRefreshControl *refreshControl = [[UIRefreshControl alloc] init];
+    [self.tableView addSubview:refreshControl];
+    [refreshControl addTarget:self action:@selector(refresh:) forControlEvents:UIControlEventValueChanged];
+
+    [self refresh:refreshControl];
+
+}
+
+- (void)refresh:(UIRefreshControl *)refreshControl {
+
+    self.data = [NSMutableArray array];
+    [self.tableView reloadData];
+
+    [refreshControl beginRefreshing];
+    [self startBrowsing:refreshControl];
+
+    double delayInSeconds = 5.0;
+    dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delayInSeconds * NSEC_PER_SEC));
+    dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+        [self stopBrowsing:refreshControl];
+        [refreshControl endRefreshing];
+    });
+
 }
 
 
@@ -40,7 +63,7 @@
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell"];
 
     ADDPDevice *device = self.data[(NSUInteger) indexPath.row];
-    cell.textLabel.text = device.mac;
+    cell.textLabel.text = device.title;
     cell.detailTextLabel.text = device.ip;
 
     return cell;
@@ -56,7 +79,8 @@
     }
     if (!exists){
         [self.data addObject:device];
-        [self.tableView reloadData];
+
+        [self.tableView insertRowsAtIndexPaths:@[[NSIndexPath indexPathForRow:[self.data count]-1 inSection:0]] withRowAnimation:UITableViewRowAnimationAutomatic];
     }
 
 }

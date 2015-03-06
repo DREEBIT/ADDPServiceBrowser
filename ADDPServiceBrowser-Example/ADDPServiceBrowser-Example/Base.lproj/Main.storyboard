@@ -2,9 +2,10 @@
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="6254" systemVersion="14C109" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" initialViewController="AGz-1U-bJA">
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="6247"/>
+        <capability name="Constraints to layout margins" minToolsVersion="6.0"/>
     </dependencies>
     <scenes>
-        <!--Browser View Controller-->
+        <!--ADDP Devices-->
         <scene sceneID="tne-QT-ifu">
             <objects>
                 <viewController id="BYZ-38-t0r" customClass="BrowserViewController" sceneMemberID="viewController">
@@ -16,7 +17,7 @@
                         <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <tableView clipsSubviews="YES" contentMode="scaleToFill" fixedFrame="YES" alwaysBounceVertical="YES" dataMode="prototypes" style="plain" separatorStyle="default" rowHeight="44" sectionHeaderHeight="22" sectionFooterHeight="22" translatesAutoresizingMaskIntoConstraints="NO" id="A6o-Wf-Nbt">
+                            <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" dataMode="prototypes" style="plain" separatorStyle="default" rowHeight="44" sectionHeaderHeight="22" sectionFooterHeight="22" translatesAutoresizingMaskIntoConstraints="NO" id="A6o-Wf-Nbt">
                                 <rect key="frame" x="0.0" y="0.0" width="600" height="600"/>
                                 <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
                                 <prototypes>
@@ -49,19 +50,14 @@
                             </tableView>
                         </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="calibratedWhite"/>
+                        <constraints>
+                            <constraint firstItem="A6o-Wf-Nbt" firstAttribute="top" secondItem="8bC-Xf-vdC" secondAttribute="topMargin" id="Adp-hS-aXj"/>
+                            <constraint firstItem="A6o-Wf-Nbt" firstAttribute="leading" secondItem="8bC-Xf-vdC" secondAttribute="leadingMargin" constant="-16" id="H1O-Pi-57z"/>
+                            <constraint firstItem="wfy-db-euE" firstAttribute="top" secondItem="A6o-Wf-Nbt" secondAttribute="bottom" id="Wjf-0F-5pq"/>
+                            <constraint firstAttribute="trailingMargin" secondItem="A6o-Wf-Nbt" secondAttribute="trailing" constant="-16" id="g1z-dM-jf0"/>
+                        </constraints>
                     </view>
-                    <navigationItem key="navigationItem" id="sFV-x9-iJi">
-                        <barButtonItem key="leftBarButtonItem" title="Stop" id="e87-W2-BeZ">
-                            <connections>
-                                <action selector="stopBrowsing:" destination="BYZ-38-t0r" id="9c7-J8-YO2"/>
-                            </connections>
-                        </barButtonItem>
-                        <barButtonItem key="rightBarButtonItem" title="Start" id="xdy-f1-e6E">
-                            <connections>
-                                <action selector="startBrowsing:" destination="BYZ-38-t0r" id="em2-ya-wKo"/>
-                            </connections>
-                        </barButtonItem>
-                    </navigationItem>
+                    <navigationItem key="navigationItem" title="ADDP Devices" id="sFV-x9-iJi"/>
                     <connections>
                         <outlet property="tableView" destination="A6o-Wf-Nbt" id="lcD-bD-uUE"/>
                     </connections>
