@@ -33,6 +33,7 @@ int const ADDPPort = 2362;
 - (void)startBrowsing {
 
     self.socket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
+    [self.socket bindToPort:ADDPPort interface:@"en1" error:&err];
     [self.socket setIPv6Enabled:NO];
 
     NSError *err = nil;
