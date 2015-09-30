@@ -3,14 +3,18 @@
 // Copyright (c) 2015 Toni Möckel. All rights reserved.
 //
 
+#import <ADDPServiceBrowser/DigiDiscover.h>
 #import "ADDPBrowser.h"
 #import "GCDAsyncUdpSocket.h"
+#import "AsyncUdpSocket.h"
+#include "TargetConditionals.h"
 
 NSString *const ADDPMulticastGroupAddress = @"224.0.5.128";
 int const ADDPPort = 2362;
 
 
 @interface ADDPBrowser ()
+@property(nonatomic, strong) GCDAsyncUdpSocket *asyncSocket;
 @property(nonatomic, strong) id socket;
 @end
 
@@ -32,18 +36,38 @@ int const ADDPPort = 2362;
 
 - (void)startBrowsing {
 
-    self.socket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
-    [self.socket setIPv6Enabled:NO];
+    [self sendViaAsyncUdpSocket];
+//    [self sendViaClassicSocket];
+
+}
+
+- (void)sendViaClassicSocket {
+
+
+    DigiDiscover *digiDiscover = [[DigiDiscover alloc] init];
+    [digiDiscover startDigiDetection];
+
+}
+
+- (void)sendViaAsyncUdpSocket {
 
     NSError *err = nil;
 
-    if(![self.socket enableBroadcast:YES error:&err]) {
+    NSString *interfaceIndex = TARGET_IPHONE_SIMULATOR ? @"en1" : @"en0";
+
+    self.asyncSocket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
+    [self.asyncSocket bindToPort:ADDPPort interface:interfaceIndex error:&err];
+
+    [self.asyncSocket setIPv6Enabled:NO];
+
+    if(![self.asyncSocket enableBroadcast:YES error:&err]) {
         [self notifyDelegateWithError:err];
         return;
     }
 
 
-    if(![self.socket beginReceiving:&err]) {
+    [self.asyncSocket joinMulticastGroup:ADDPMulticastGroupAddress onInterface:interfaceIndex error:&err];
+    if(![self.asyncSocket beginReceiving:&err]) {
         [self notifyDelegateWithError:err];
         return;
     }
@@ -67,8 +91,9 @@ int const ADDPPort = 2362;
 
     NSData *data = [[NSData alloc] initWithBytes:strChar length:14];
 
-    [self.socket sendData:data toHost:ADDPMulticastGroupAddress port:ADDPPort withTimeout:-1 tag:0];
+    [self.asyncSocket sendData:data toHost:ADDPMulticastGroupAddress port:ADDPPort withTimeout:-1 tag:0];
 
+    NSLog(@"localhost: %@", self.asyncSocket.localHost);
 
 }
 
@@ -83,7 +108,7 @@ int const ADDPPort = 2362;
 
 - (void)stopBrowsing {
 
-    [self.socket close];
+    [self.asyncSocket close];
 
 }
 
@@ -154,8 +179,8 @@ withFilterContext:(id)filterContext{
 
     //Device title
     unsigned char name[32] = {};
-    [self parseUntilBreakPointFromBuffer:buffer fromIndex:30 toBuffer:name];
-    NSString *titleString = [[NSString alloc] initWithBytes:(void *)name length:32 encoding:NSASCIIStringEncoding];
+
+    NSString *titleString = [self parseUntilBreakPointFromBuffer:buffer fromIndex:31 toBuffer:name];//[[NSString alloc] initWithBytes:(void *)name length:32 encoding:NSASCIIStringEncoding];
     if (titleString.length>0){
         newDevice.title = titleString;
     }
@@ -163,14 +188,22 @@ withFilterContext:(id)filterContext{
     return newDevice;
 }
 
-- (void) parseUntilBreakPointFromBuffer:(unsigned char *)frame fromIndex:(int)startIndex toBuffer:(unsigned char *)deviceName
+- (NSString *) parseUntilBreakPointFromBuffer:(unsigned char *)frame fromIndex:(int)startIndex toBuffer:(unsigned char *)deviceName
 {
     int i = 0;
+    int j = 0;
 
-    while (frame[i + startIndex] != 0x12 && frame[i + startIndex] !=  0x10 && frame[i + startIndex] !=  0x0d) {
-        deviceName[i] = frame[i + startIndex];
+    while (frame[i + startIndex] != 0x12 && frame[i + startIndex] !=  0x10 && frame[i + startIndex] !=  0x0d ) {
+        unsigned char character =  frame[i + startIndex];
+        if (character != '\0' && character != '\x06' && character != '\x04' && character != '\x01' && character != '\b' && character != '\xfe' && character != '\x16' && character != '\xfe'){
+            deviceName[j++] = character;
+        }
         i++;
     }
+
+    NSString *deviceString = [NSString stringWithCString:(char const *) deviceName encoding:NSASCIIStringEncoding];
+    deviceString = [deviceString stringByReplacingOccurrencesOfString:@"þ" withString:@""];
+    return deviceString;
 }
 
 - (void) insertCharsFromIndex:(NSInteger)index withLenth:(NSUInteger)len fromBuffer:(unsigned char *)source inBuffer:(unsigned char *)target
