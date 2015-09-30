@@ -16,4 +16,5 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/DREEBIT/ADDPServiceBrowser.git", :tag => "1.0" }
   s.source_files  = 'ADDPServiceBrowser', 'ADDPServiceBrowser/**/*.{h,m}'
   s.requires_arc = true
+  s.dependency = 'CocoaAsyncSocket'
 end
