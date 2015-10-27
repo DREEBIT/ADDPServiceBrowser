@@ -8,6 +8,15 @@
 #import "GCDAsyncUdpSocket.h"
 #import "AsyncUdpSocket.h"
 #include "TargetConditionals.h"
+#include "ADDPInterfaceModel.h"
+
+
+#include <sys/types.h>
+#include <ifaddrs.h>
+
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 NSString *const ADDPMulticastGroupAddress = @"224.0.5.128";
 int const ADDPPort = 2362;
@@ -15,6 +24,7 @@ int const ADDPPort = 2362;
 
 @interface ADDPBrowser ()
 @property(nonatomic, strong) GCDAsyncUdpSocket *asyncSocket;
+@property(nonatomic, strong) NSMutableArray *socketArray;
 @property(nonatomic, strong) id socket;
 @end
 
@@ -26,11 +36,11 @@ int const ADDPPort = 2362;
 
     [self startBrowsing];
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-
-        [self stopBrowsing];
-
-    });
+//    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+//
+//        [self stopBrowsing];
+//
+//    });
 
 }
 
@@ -49,30 +59,43 @@ int const ADDPPort = 2362;
 
 }
 
-- (void)sendViaAsyncUdpSocket {
 
-    NSError *err = nil;
-
-    NSString *interfaceIndex = TARGET_IPHONE_SIMULATOR ? @"en1" : @"en0";
-
-    self.asyncSocket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self delegateQueue:dispatch_get_main_queue()];
-    [self.asyncSocket bindToPort:ADDPPort interface:interfaceIndex error:&err];
-
-    [self.asyncSocket setIPv6Enabled:NO];
-
-    if(![self.asyncSocket enableBroadcast:YES error:&err]) {
-        [self notifyDelegateWithError:err];
-        return;
+- (NSMutableArray *) enumerateAndGetDetailsOfAllNetworkInterfaces
+{
+    NSMutableArray *interfaceArray = [[NSMutableArray alloc] init];
+    struct ifaddrs *ifap, *ifa;
+    struct sockaddr_in *sa;
+    char *addr;
+    
+    getifaddrs (&ifap);
+    
+    for (ifa = ifap; ifa; ifa = ifa->ifa_next)
+    {
+        if (ifa->ifa_addr->sa_family==AF_INET)
+        {
+            ADDPInterfaceModel *interfaceModel = [[ADDPInterfaceModel alloc] init];
+            
+            sa = (struct sockaddr_in *) ifa->ifa_addr;
+            addr = inet_ntoa(sa->sin_addr);
+            printf("Interface: %s\tAddress: %s\n", ifa->ifa_name, addr);
+            
+            interfaceModel.interfaceName = [NSString stringWithCString:ifa->ifa_name encoding:NSUTF8StringEncoding];
+            interfaceModel.interfaceIPAddress = [NSString stringWithCString:addr encoding:NSUTF8StringEncoding];
+            
+            [interfaceArray addObject:interfaceModel];
+        }
     }
+    
+    freeifaddrs(ifap);
+    return interfaceArray;
+}
 
 
-    [self.asyncSocket joinMulticastGroup:ADDPMulticastGroupAddress onInterface:interfaceIndex error:&err];
-    if(![self.asyncSocket beginReceiving:&err]) {
-        [self notifyDelegateWithError:err];
-        return;
-    }
 
-
+- (void)sendViaAsyncUdpSocket{
+    
+    NSError *error;
+    
     char strChar[14] = "";
     strChar[0] = 'D';
     strChar[1] = 'I';
@@ -88,17 +111,58 @@ int const ADDPPort = 2362;
     strChar[11] = 0xff;
     strChar[12] = 0xff;
     strChar[13] = 0xff;
-
+    
     NSData *data = [[NSData alloc] initWithBytes:strChar length:14];
+    
+    self.socketArray = [NSMutableArray array];
 
-    [self.asyncSocket sendData:data toHost:ADDPMulticastGroupAddress port:ADDPPort withTimeout:-1 tag:0];
 
-    NSLog(@"localhost: %@", self.asyncSocket.localHost);
+//    NSString *interfaceIndex = TARGET_IPHONE_SIMULATOR ? @"en1" : @"en0";
+    
+    NSMutableArray *interfaceArray = [self enumerateAndGetDetailsOfAllNetworkInterfaces];
+
+    
+    int i = 1;
+    
+    for(ADDPInterfaceModel *interfaceModel in interfaceArray)
+    {
+        
+        NSError *error;
+        
+        NSInteger udpPort =  ADDPPort;
+        
+        GCDAsyncUdpSocket *gcdAsyncUdpSocket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self
+                                                                             delegateQueue:dispatch_get_main_queue()];
+        [gcdAsyncUdpSocket bindToPort:udpPort interface:interfaceModel.interfaceName error:&error];
+        gcdAsyncUdpSocket.delegate = self;
+        [gcdAsyncUdpSocket setPreferIPv6];
+        
+        if (![gcdAsyncUdpSocket enableBroadcast:YES error:&error]) {
+            NSLog(@"Error enableBroadcast:%@",error);
+            return;
+        }
+        
+        [gcdAsyncUdpSocket  beginReceiving:&error];
+        
+        [gcdAsyncUdpSocket  sendData:data toHost:ADDPMulticastGroupAddress port:ADDPPort withTimeout:-1 tag:i++];
+        
+        
+        if(error == nil)
+        {
+            [self.socketArray addObject:gcdAsyncUdpSocket];
+        }
+
+        
+        
+    }
+
 
 }
 
 - (void) notifyDelegateWithError:(NSError *)error
 {
+    
+    
     dispatch_async(dispatch_get_main_queue(), ^{
         @autoreleasepool {
             [_delegate addpBrowser:self didNotStartBrowsingForDevices:error];
@@ -108,8 +172,22 @@ int const ADDPPort = 2362;
 
 - (void)stopBrowsing {
 
-    [self.asyncSocket close];
+    for (GCDAsyncUdpSocket *socket in self.socketArray){
+        if (!socket.isClosed){
+            [socket close];
+        }
+    }
 
+}
+
+- (BOOL) allSocketsClosed {
+    BOOL allClosed = YES;
+    for (GCDAsyncUdpSocket *socket in self.socketArray){
+        if (!socket.isClosed){
+            allClosed = NO;
+        }
+    }
+    return allClosed;
 }
 
 
@@ -121,7 +199,9 @@ int const ADDPPort = 2362;
 
 - (void)udpSocketDidClose:(GCDAsyncUdpSocket *)sock withError:(NSError *)error {
 
-    [self notifyDelegateWithError:error];
+    if ([self allSocketsClosed]){
+        [self notifyDelegateWithError:error];
+    }
 
 }
 
